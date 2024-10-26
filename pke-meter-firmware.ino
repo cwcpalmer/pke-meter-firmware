@@ -7,6 +7,9 @@
 #include "neopixel.h"
 #include "bluetooth.h"
 
+// CONFIG VALUES
+#define BLUETOOTH_NAME  "PKE Meter: Matty"
+
 Adafruit_BMP280 sensor_onboard_temp_barometric;
 
 float reading_onboard_temp;
@@ -29,15 +32,15 @@ void onBleDisconnect(uint16_t connectionHandle, uint8_t disconnectReason) {
 void setup() {
   init_debugger();
   init_neopixel();
-  init_bluetooth((char*)"PKE Meter: V", onBleConnect, onBleDisconnect);
+  init_bluetooth((char*)BLUETOOTH_NAME, onBleConnect, onBleDisconnect);
   sensor_onboard_temp_barometric.begin();
 }
 //-------------------------------------------------------------------------------------------------
 void loop() {
   if(isConnected) {
-    reading_onboard_temp = ((sensor_onboard_temp_barometric.readTemperature() * 9) / 5) + 32;
-    debug_ln(String("Temperature: ") + String(reading_onboard_temp) + String(" F"));
+    reading_onboard_temp = sensor_onboard_temp_barometric.readTemperature();
+    debug_ln(String("Temperature: ") + String(reading_onboard_temp) + String(" C"));
   }
 
-  delay(5000);
+  delay(1000);
 }
