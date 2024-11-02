@@ -4,9 +4,9 @@
 #define MAX_CONCURRENT_BLE_PERIPHERAL_CONNECTIONS   1 // This is so the hardware is a peripheral device (one connection at a time)
 #define MAX_CONCURRENT_BLE_CENTRAL_CONNECTIONS      0 // If greater than 0, the hardware would be the device in charge
 
-// First byte on write indicates which sensors to read from
+// First byte on write indicates which sensors to read from (max 5 sensors per characteristic)
 // Response will be first byte mirroring request to indicate sensors
-// Following bytes will be 2-byte each representing a int-16 (positive or negative) starting with the smallest bit sensor first
+// Following bytes will be 4-byte each representing a float (positive or negative) starting with the smallest bit sensor first
 #define SENSOR_TEMPERATURE          0b00000001
 #define SENSOR_BAROMETRIC_PRESSURE  0b00000010
 
@@ -37,7 +37,7 @@ void onWrite(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t 
     uint8_t byteCount = 1;
     for(uint8_t shift = 0; shift < 8; shift++) {
       if (data[0] & (1 << shift)) {
-        byteCount += 2;
+        byteCount += sizeof(float);
       }
     }
 
@@ -45,13 +45,13 @@ void onWrite(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t 
     response[0] = 0;
     uint8_t byteIndex = 1;
 
-    // Populate each additional pair of bytes
+    // Populate each additional 4 bytes
     if (data[0] & SENSOR_TEMPERATURE) {
       response[0] |= SENSOR_TEMPERATURE; // Adding sensor flag to the first byte
-      int16_t temperatureValue = 32;
-      // Split into little endian bytes
-      response[byteIndex++] = (temperatureValue >> 8) & 0xFF;
-      response[byteIndex++] = temperatureValue & 0xFF;
+      float temperatureValue = 34.72;
+      // Split into big endian bytes
+      memcpy(&response[byteIndex], &temperatureValue, sizeof(float));
+      byteIndex += sizeof(float);
     }
 
     sensorSet1Characteristic.notify(response, sizeof(response));
