@@ -15,8 +15,14 @@ void set_up_environment_sensors_service(void);
 
 BLEService        environmentSensorsService = BLEService("ffe34776-8d60-421a-98de-a9d137253d45");
 BLECharacteristic sensorSet1Characteristic = BLECharacteristic("32824887-d3da-4744-bafc-47c9bc1d5c64");
+BLEBas            battService;
 
-void init_bluetooth(char* advertisementName, ble_connect_callback_t bleConnectCallback, ble_disconnect_callback_t bleDisconnectCallback) {
+static SensorReadings sensorReadCallbacksSet1;
+
+void init_bluetooth(char* advertisementName, ble_connect_callback_t bleConnectCallback, ble_disconnect_callback_t bleDisconnectCallback, SensorReadings sensorSet1Callbacks) {
+  // Configure global callbacks
+  sensorReadCallbacksSet1 = sensorSet1Callbacks;
+  
   // Set up hardware
   Bluefruit.begin(MAX_CONCURRENT_BLE_PERIPHERAL_CONNECTIONS, MAX_CONCURRENT_BLE_CENTRAL_CONNECTIONS);
   Bluefruit.Periph.setConnectCallback(bleConnectCallback);
@@ -24,6 +30,8 @@ void init_bluetooth(char* advertisementName, ble_connect_callback_t bleConnectCa
 
   // Set up services
   set_up_environment_sensors_service();
+  battService.begin();
+  battService.write(100);   ///Starting the service and setting it to 100%
 
   // Start advertising
   start_bluetooth_advertising(advertisementName);
@@ -48,8 +56,9 @@ void onWrite(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t 
     // Populate each additional 4 bytes
     if (data[0] & SENSOR_TEMPERATURE) {
       response[0] |= SENSOR_TEMPERATURE; // Adding sensor flag to the first byte
-      float temperatureValue = 34.72;
-      // Split into big endian bytes
+      float temperatureValue = sensorReadCallbacksSet1.sensor1();
+
+      // Split into little endian bytes
       memcpy(&response[byteIndex], &temperatureValue, sizeof(float));
       byteIndex += sizeof(float);
     }
@@ -88,4 +97,8 @@ void start_bluetooth_advertising(char* advertisementName) {
   Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
   Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds  
+}
+//-------------------------------------------------------------------------------------------------
+void update_battery_level(int batteryPercentage) {
+  battService.write(batteryPercentage);
 }
