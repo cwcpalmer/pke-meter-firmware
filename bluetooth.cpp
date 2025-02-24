@@ -7,8 +7,8 @@
 // First byte on write indicates which sensors to read from (max 5 sensors per characteristic)
 // Response will be first byte mirroring request to indicate sensors
 // Following bytes will be 4-byte each representing a float (positive or negative) starting with the smallest bit sensor first
-#define SENSOR_TEMPERATURE          0b00000001
-#define SENSOR_BAROMETRIC_PRESSURE  0b00000010
+#define SENSOR_TEMPERATURE_1        0b00000001
+#define SENSOR_TEMPERATURE_2        0b00000010
 
 void start_bluetooth_advertising(char* advertisementName);
 void set_up_environment_sensors_service(void);
@@ -38,7 +38,7 @@ void init_bluetooth(char* advertisementName, ble_connect_callback_t bleConnectCa
 }
 //-------------------------------------------------------------------------------------------------
 void onWrite(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len) {
-  debug_ln("On Write Hit");
+  debug_ln("On Write Requested");
 
   if (len == 1) {
     // Determine how many bits are set in the sensors byte to size the response
@@ -49,17 +49,28 @@ void onWrite(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t 
       }
     }
 
+    debug_ln(String("Byte Count: ") + String(byteCount));
+
     uint8_t response[byteCount] = {0};
     response[0] = 0;
     uint8_t byteIndex = 1;
 
     // Populate each additional 4 bytes
-    if (data[0] & SENSOR_TEMPERATURE) {
-      response[0] |= SENSOR_TEMPERATURE; // Adding sensor flag to the first byte
+    if (data[0] & SENSOR_TEMPERATURE_1) {
+      response[0] |= SENSOR_TEMPERATURE_1; // Adding sensor flag to the first byte
       float temperatureValue = sensorReadCallbacksSet1.sensor1();
 
       // Split into little endian bytes
       memcpy(&response[byteIndex], &temperatureValue, sizeof(float));
+      byteIndex += sizeof(float);
+    }
+
+    if (data[0] & SENSOR_TEMPERATURE_2) {
+      response[0] |= SENSOR_TEMPERATURE_2; // Adding sensor flag to the first byte
+      float temperatureValue2 = sensorReadCallbacksSet1.sensor2();
+
+      // Split into little endian bytes
+      memcpy(&response[byteIndex], &temperatureValue2, sizeof(float));
       byteIndex += sizeof(float);
     }
 
@@ -78,9 +89,9 @@ void set_up_environment_sensors_service(void) {
   sensorSet1Characteristic.setWriteCallback(onWrite);
   sensorSet1Characteristic.begin();
 
-  // Set initial value for temperature
-  uint8_t temperatureData[1] = { 0x00 };
-  sensorSet1Characteristic.write(temperatureData, sizeof(temperatureData));
+  // Set initial value for sensorSet1
+  uint8_t sensorData[1] = { 0x00 };
+  sensorSet1Characteristic.write(sensorData, sizeof(sensorData));
 }
 //-------------------------------------------------------------------------------------------------
 void start_bluetooth_advertising(char* advertisementName) {

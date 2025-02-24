@@ -3,16 +3,22 @@
 #endif
 
 #include <Adafruit_BMP280.h> // for onboard temperature and barometric pressure
+#include <Wire.h>
+#include "Adafruit_MCP9808.h" // for more precise temperature sensor
 #include "debugger.h"
 #include "neopixel.h"
 #include "bluetooth.h"
 
 // CONFIG VALUES
-#define BLUETOOTH_NAME  "PKE Meter: Matty"
+#define BLUETOOTH_NAME                "PKE Meter: John"
+#define SENSOR_ADDON_TEMP_I2C_ADDRESS 0x18
+#define SENSOR_ADDON_TEMP_RESOLUTION  3 // 0-3 where higher is more precise at cost of sample time
 
 Adafruit_BMP280 sensor_onboard_temp_barometric;
+Adafruit_MCP9808 sensor_addon_temp = Adafruit_MCP9808();
 
 float reading_onboard_temp;
+float reading_addon_temp;
 
 bool isConnected = false;
 
@@ -23,6 +29,7 @@ void updateBattery();
 //-------------------------------------------------------------------------------------------------
 void onBleConnect(uint16_t connectionHandle) {
   debug_ln("Connected Bluetooth");
+  sensor_addon_temp.wake();
   isConnected = true;
   set_neopixel_color(NEOPIXEL_COLOR_BLUE);
   updateBattery();
@@ -31,11 +38,16 @@ void onBleConnect(uint16_t connectionHandle) {
 void onBleDisconnect(uint16_t connectionHandle, uint8_t disconnectReason) {
   debug_ln("Disconnected Bluetooth");
   isConnected = false;
+  sensor_addon_temp.shutdown_wake(1);
   set_neopixel_color(NEOPIXEL_COLOR_YELLOW);
 }
 //-------------------------------------------------------------------------------------------------
-static float updateTemperature(void) {
+static float updateTemperature1(void) {
   return sensor_onboard_temp_barometric.readTemperature();
+} 
+//-------------------------------------------------------------------------------------------------
+static float updateTemperature2(void) {
+  return sensor_addon_temp.readTempC();
 } 
 //-------------------------------------------------------------------------------------------------
 void updateBattery() {
@@ -62,17 +74,39 @@ void setup() {
   init_debugger();
   init_neopixel();
 
+  // Configure addon temperature sensor board
+  if (!sensor_addon_temp.begin(SENSOR_ADDON_TEMP_I2C_ADDRESS)) {
+    while(1) {
+      debug_ln(String("Could not connect to addon temp sensor"));
+      delay(1000);
+    }
+  }
+
+  sensor_addon_temp.setResolution(SENSOR_ADDON_TEMP_RESOLUTION);
+  sensor_addon_temp.shutdown_wake(1);
+
   // Configure callbacks for first set of sensors (characteristic)
-  sensorSet1Callbacks.sensor1 = updateTemperature;
+  sensorSet1Callbacks.sensor1 = updateTemperature1;
+  sensorSet1Callbacks.sensor2 = updateTemperature2;
 
   init_bluetooth((char*)BLUETOOTH_NAME, onBleConnect, onBleDisconnect, sensorSet1Callbacks);
   sensor_onboard_temp_barometric.begin();
 }
 //-------------------------------------------------------------------------------------------------
 void loop() {
-  if(isConnected) {
+#if __DEBUGGER_ON__
+    // On-board Temperature
     reading_onboard_temp = sensor_onboard_temp_barometric.readTemperature();
-    debug_ln(String("Temperature: ") + String(reading_onboard_temp) + String(" C"));
+    debug_ln(String("Onboard Temperature: ") + String(reading_onboard_temp) + String(" C"));
+
+    // Add-on Temperature
+    sensor_addon_temp.wake();
+    reading_addon_temp = sensor_addon_temp.readTempC();
+    debug_ln(String("Addon Temperature: ") + String(reading_addon_temp) + String(" C"));
+    //sensor_addon_temp.shutdown_wake(1);
+#endif
+
+  if(isConnected) {
     updateBattery();
   }
 
