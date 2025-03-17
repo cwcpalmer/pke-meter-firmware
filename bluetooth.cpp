@@ -112,4 +112,5 @@ void start_bluetooth_advertising(char* advertisementName) {
 //-------------------------------------------------------------------------------------------------
 void update_battery_level(int batteryPercentage) {
   battService.write(batteryPercentage);
+  battService.notify(batteryPercentage);
 }

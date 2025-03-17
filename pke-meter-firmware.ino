@@ -10,7 +10,7 @@
 #include "bluetooth.h"
 
 // CONFIG VALUES
-#define BLUETOOTH_NAME                "PKE Meter: John"
+#define BLUETOOTH_NAME                "PKE Meter: Wired"
 #define SENSOR_ADDON_TEMP_I2C_ADDRESS 0x18
 #define SENSOR_ADDON_TEMP_RESOLUTION  3 // 0-3 where higher is more precise at cost of sample time
 
